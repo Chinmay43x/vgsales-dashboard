@@ -1,0 +1,257 @@
+---
+title: "Video Games Sales Dashboard"
+output:
+  flexdashboard::flex_dashboard:
+    orientation: columns
+    vertical_layout: fill
+    theme: united
+    css: 
+    navbar:
+        - {icon: "fa-solid fa-database", href: "https://www.kaggle.com/datasets/thedevastator/global-video-game-sales", align: right}
+        - { icon: "fa-github", href: "https://github.com/Chinmay43x", align: right}
+        - { icon: "fa-linkedin", href: "https://www.linkedin.com/in/chinmay-pandya-ab7483222/", align: right}
+
+---
+
+```{r setup, include=FALSE}
+library(flexdashboard)
+library(tidyverse)
+library(highcharter)
+library(gt)
+library(DT)
+library(htmltools)
+library(viridis)
+library(ggplot2)
+library(moments)
+library(sandwich)
+library(lmtest)
+library(bslib)
+```
+
+```{r}
+df <- read_csv('/Users/chinmaypandya/Downloads/vgsales.csv', show_col_types = FALSE)
+```
+## Heading {.tabset .tabset-fade .tabset-pills}
+### Introduction {.tabset .tabset-fade}
+```{r}
+intr <- 'This dataset, sourced from vgchartz.com, offers a wealth of insights into the dynamics between platform and genre for the top 100 video games worldwide. Observe which platforms are driving global sales, what genres have been most successful in different regions across the world, and how both of these factors have changed over time. Analyze this data to inform your understanding of the gaming industry and discover trends propelling game developers to success '
+intr
+```
+####  {.tabset .tabset-fade}
+```{r}
+knitr::include_graphics("/Users/chinmaypandya/Downloads/vg game pic.jpeg")
+```
+
+
+### Description of Data {.tabset .tabset-fade}
+```{r}
+  p("Data Contains below columns and data-types:")
+   # Read data from Excel file
+excel_data <- readxl::read_excel("/Users/chinmaypandya/Downloads/Vg columns.xlsx")
+
+# Display data table
+datatable(excel_data)
+```
+
+### Descriptive Stat of Data {.tabset .tabset-fade}
+```{r}
+summary_stats1 <- df %>%
+  summarise(
+    Length= length(NA_Sales),
+    Minimun= min(NA_Sales),
+    Maximum= max(NA_Sales),
+    Mean = mean(NA_Sales),
+    Mode = mode(NA_Sales),  # Custom function for mode
+    Median = median(NA_Sales),
+    SD = sd(NA_Sales),
+    Kurtosis = kurtosis(NA_Sales),
+    Skewness = skewness(NA_Sales)
+  )
+
+print(summary_stats1)
+
+
+summary_stats2 <- df %>%
+  summarise(
+    Length= length(Global_Sales),
+    Minimun= min(Global_Sales),
+    Maximum= max(Global_Sales),
+    Mean = mean(Global_Sales),
+    Mode = mode(Global_Sales),  # Custom function for mode
+    Median = median(Global_Sales),
+    SD = sd(Global_Sales),
+    Kurtosis = kurtosis(Global_Sales),
+    Skewness = skewness(Global_Sales)
+  )
+
+print(summary_stats2)
+```
+
+#### Descriptive Statistics {.tabset .tabset-fade}
+```{r}
+summary(df[, c("Rank", "Year", "NA_Sales", "EU_Sales", "JP_Sales", "Other_Sales", "Global_Sales")])
+
+```
+
+### Inferential Statistics {.tabset .tabset-fade}
+#### T test {.tabset .tabset-fade}
+```{r}
+ttest = t.test(df$NA_Sales, paired = FALSE, var.equal = FALSE, data = df);
+ttest
+```
+
+#### Chi-Square Test {.tabset .tabset-fade}
+```{r}
+cross_table <- table(df$NA_Sales, df$Global_Sales)
+
+# Perform chi-square test
+chi_square_result <- chisq.test(cross_table)
+chi_square_result
+```
+
+#### Anova {.tabset .tabset-fade}
+```{r}
+anova_model <- aov(Global_Sales ~ Genre, data = df)
+
+# Summary of ANOVA
+anova_summary <- summary(anova_model)
+anova_summary
+```
+
+#### Correlation Matrix {.tabset .tabset-fade}
+```{r}
+cor_matrix <- cor(df[, c("NA_Sales", "EU_Sales", "JP_Sales", "Other_Sales", "Global_Sales")])
+cor_matrix
+```
+
+#### Regression {.tabset .tabset-fade}
+```{r}
+# Regression
+reg_model = Global_Sales ~ Platform + Genre + Year 
+lin_reg = lm(formula = reg_model, data = df)
+lin_reg_summary = summary(lin_reg); lin_reg_summary
+```
+
+#### Plots {.tabset .tabset-fade}
+```{r}
+par(mfrow = c(2,2))  # divides the plot area into 2 rows & 2 columns
+plot(lin_reg)
+```
+
+####  Relationship between Genre and Global Sales{.tabset .tabset-fade}
+```{r}
+# Test for Relationship between Genre and Global Sales
+genre_test <- aov(Global_Sales ~ Genre, data = df)
+summary(genre_test)
+```
+
+
+## Video games Sales dashboard {.tabset .tabset-fade}
+
+### Genre Distribution 
+```{r}
+# Genre Distribution
+genre_distribution <- df %>%
+  group_by(Genre) %>%
+  summarise(Count = n())
+
+pie(genre_distribution$Count, labels = genre_distribution$Genre,
+    main = "Genre Distribution", col = rainbow(length(genre_distribution$Genre)))
+```
+
+### Sales By Region 
+```{r}
+# Summarize sales by region
+sales_by_region <- df %>%
+  summarise(
+    NA_Sales = sum(NA_Sales),
+    EU_Sales = sum(EU_Sales),
+    JP_Sales = sum(JP_Sales),
+    Other_Sales = sum(Other_Sales),
+    Global_Sales = sum(Global_Sales)
+  )
+
+# Create a bar plot
+barplot(t(sales_by_region), beside = TRUE, col = rainbow(5),
+        main = "Sales by Region",
+        xlab = "NA               EU           JP            Other            Global",
+        ylab = "Sales (in millions)",
+        legend = c("North America","Europe","Japan","Others","Global"))
+```
+
+### Top Publishers
+```{r}
+top_publishers <- df %>%
+  group_by(Publisher) %>%
+  summarise(Global_Sales = sum(Global_Sales)) %>%
+  arrange(desc(Global_Sales)) %>%
+  head(10)
+
+top_publishers_plot <- ggplot(top_publishers, aes(x = reorder(Publisher, -Global_Sales), y = Global_Sales)) +
+  geom_bar(stat = "identity", fill = "skyblue") +
+  labs(title = "Top 10 Publishers by Global Sales", y = "Global Sales (in millions)", x = "Publisher") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+top_publishers_plot
+```
+
+### Platform Distribution 
+```{r}
+# Platform distribution
+platform_distribution <- df %>%
+  group_by(Platform) %>%
+  summarise(Count = n()) %>%
+  arrange(desc(Count))
+
+# Create a pie chart
+pie(platform_distribution$Count, labels = platform_distribution$Platform,
+    main = "Platform Distribution",
+    col = rainbow(length(platform_distribution$Platform)))
+```
+
+### Global Sales Over Time 
+```{r}
+# Sales over time
+sales_over_time <- df %>%
+  group_by(Year) %>%
+  summarise(Total_Sales = sum(Global_Sales, na.rm = TRUE))
+
+# Create a line chart
+hchart(sales_over_time, "line", hcaes(x = Year, y = Total_Sales)) %>%
+  hc_title(text = "Global Sales Over Time") %>%
+  hc_yAxis(title = list(text = "Global Sales"))
+```
+
+### Average Rank By Platform 
+```{r}
+summary_data <- df %>%
+  group_by(Platform) %>%
+  summarise(Total_Sales = sum(Global_Sales, na.rm = TRUE),
+            Average_Score = mean(Rank, na.rm = TRUE))
+
+highchart() %>%
+  hc_chart(type = "bar") %>%
+  hc_title(text = "Average Rank by Platform") %>%
+  hc_xAxis(categories = summary_data$Platform) %>%
+  hc_yAxis(title = list(text = "Average Rank")) %>%
+  hc_add_series(name = "Average Rank", data = summary_data$Average_Score)
+```
+
+### Total Sales by Platform 
+```{r}
+# Sales by Platform
+sales_by_platform <- df %>%
+  group_by(Platform) %>%
+  summarise(Total_Sales = sum(Global_Sales))
+
+barplot(sales_by_platform$Total_Sales, names.arg = sales_by_platform$Platform,
+        col = "skyblue", main = "Total Sales by Platform",
+        xlab = "Platform", ylab = "Total Sales")
+```
+
+### Interactive Table 
+```{r}
+# Interactive Table
+library(DT)
+datatable(df)
+```
